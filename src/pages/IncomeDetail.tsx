@@ -1,26 +1,25 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import useAppStore from '../store';
-import { INCOME_TYPE_LABELS, IncomeType } from '../types';
+import { INCOME_TYPE_LABELS } from '../types';
 import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react';
 
 function IncomeDetail() {
-  const { id, type } = useParams<{ id: string; type: IncomeType }>();
+  const { id, type } = useParams<{ id: string; type: string }>();
   const { characters, getIncomesByCharacterAndType, addIncome, deleteIncome } = useAppStore();
-  const character = characters.find((c) => c.id === id);
-  const incomes = type ? getIncomesByCharacterAndType(id!, type) : [];
-
+  const character = characters.find(c => c.id === id);
+  const incomes = getIncomesByCharacterAndType(id!, type as any);
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
 
-  if (!character || !type) {
+  if (!character) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-xl mb-4">页面不存在</p>
-          <Link to="/" className="text-amber-400 hover:text-amber-300">
+          <p className="text-xl mb-4 text-white">人物不存在</p>
+          <Link to="/" className="text-amber-400 hover:text-amber-300 transition-colors">
             返回首页
           </Link>
         </div>
@@ -28,36 +27,34 @@ function IncomeDetail() {
     );
   }
 
+  const totalAmount = incomes.reduce((sum, i) => sum + i.amount, 0);
+
   const handleAddIncome = (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (!isNaN(numAmount) && numAmount > 0) {
-      addIncome(character.id, type, numAmount, date, note);
+      addIncome(character.id, type as any, numAmount, date, note);
       setAmount('');
       setNote('');
       setShowAddModal(false);
     }
   };
 
-  const totalAmount = incomes.reduce((sum, i) => sum + i.amount, 0);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Link
-            to={`/character/${character.id}`}
-            className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            返回
-          </Link>
-        </div>
+        <Link
+          to={`/character/${id}`}
+          className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          返回
+        </Link>
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-amber-400">{character.name}</h1>
-          <p className="text-xl text-green-400">{INCOME_TYPE_LABELS[type]}</p>
-          <p className="text-3xl font-bold text-green-300 mt-2">¥{totalAmount.toFixed(2)}</p>
+          <h1 className="text-4xl font-bold mb-2 text-amber-400">{character.name}</h1>
+          <p className="text-2xl text-green-400">{INCOME_TYPE_LABELS[type as keyof typeof INCOME_TYPE_LABELS]}</p>
+          <p className="text-4xl font-bold text-green-300 mt-4">¥{totalAmount.toFixed(2)}</p>
         </div>
 
         <div className="mb-8">
@@ -85,7 +82,7 @@ function IncomeDetail() {
                   {income.note && <p className="text-slate-300">{income.note}</p>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xl font-bold text-green-400">¥{income.amount.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-green-400">¥{income.amount.toFixed(2)}</span>
                   <button
                     onClick={() => {
                       if (confirm('确定要删除这条记录吗？')) {
@@ -112,7 +109,9 @@ function IncomeDetail() {
         {showAddModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700">
-              <h2 className="text-2xl font-bold mb-6 text-green-400">添加{INCOME_TYPE_LABELS[type]}记录</h2>
+              <h2 className="text-2xl font-bold mb-6 text-green-400">
+                添加{INCOME_TYPE_LABELS[type as keyof typeof INCOME_TYPE_LABELS]}记录
+              </h2>
               <form onSubmit={handleAddIncome}>
                 <div className="mb-4">
                   <label className="block text-sm text-slate-400 mb-2">金额</label>

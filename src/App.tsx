@@ -1,10 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Home from "@/pages/Home";
-import CharacterDetail from "@/pages/CharacterDetail";
-import ExpenseDetail from "@/pages/ExpenseDetail";
-import IncomeDetail from "@/pages/IncomeDetail";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import CharacterDetail from './pages/CharacterDetail';
+import ExpenseDetail from './pages/ExpenseDetail';
+import IncomeDetail from './pages/IncomeDetail';
 
-export default function App() {
+function App() {
   return (
     <Router>
       <Routes>
@@ -16,3 +16,5 @@ export default function App() {
     </Router>
   );
 }
+
+export default App;

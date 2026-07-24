@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import useAppStore from '../store';
-import { EXPENSE_TYPE_LABELS, INCOME_TYPE_LABELS } from '../types';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Download, Upload } from 'lucide-react';
 
 function Home() {
-  const { characters, getCharacterStats, addCharacter, deleteCharacter } = useAppStore();
+  const { characters, expenses, incomes, getCharacterStats, addCharacter, deleteCharacter, setCharacters, setExpenses, setIncomes } = useAppStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newServer, setNewServer] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddCharacter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,9 +20,78 @@ function Home() {
     }
   };
 
+  const handleExport = () => {
+    const data = {
+      characters,
+      expenses,
+      incomes,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mhxy-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string);
+          if (data.characters && data.expenses && data.incomes) {
+            setCharacters(data.characters);
+            setExpenses(data.expenses);
+            setIncomes(data.incomes);
+            alert('数据导入成功！');
+          } else {
+            alert('无效的备份文件！');
+          }
+        } catch (error) {
+          alert('导入失败，请检查文件格式！');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            导出数据
+          </button>
+          <button
+            onClick={handleImportClick}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <Upload className="w-5 h-5" />
+            导入数据
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
+        </div>
+
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-amber-400 to-yellow-600 bg-clip-text text-transparent">
             梦幻西游消费记录

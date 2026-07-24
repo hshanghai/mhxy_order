@@ -15,6 +15,9 @@ interface AppState {
   getCharacterStats: (characterId: string) => CharacterStats;
   getExpensesByCharacterAndType: (characterId: string, type: ExpenseType) => Expense[];
   getIncomesByCharacterAndType: (characterId: string, type: IncomeType) => Income[];
+  setCharacters: (characters: Character[]) => void;
+  setExpenses: (expenses: Expense[]) => void;
+  setIncomes: (incomes: Income[]) => void;
 }
 
 const useAppStore = create<AppState>()(
@@ -126,6 +129,10 @@ const useAppStore = create<AppState>()(
           .incomes.filter((i) => i.characterId === characterId && i.type === type)
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
+
+      setCharacters: (characters) => set({ characters }),
+      setExpenses: (expenses) => set({ expenses }),
+      setIncomes: (incomes) => set({ incomes }),
     }),
     {
       name: 'mhxy-storage',
