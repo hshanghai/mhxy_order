@@ -1,102 +1,136 @@
-import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import useAppStore from '../store';
-import { Plus, Trash2, Download, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Trash2, LogOut } from 'lucide-react';
+
+const API_BASE = '/api';
+
+interface Character {
+  id: number;
+  name: string;
+  server: string;
+  created_at: string;
+}
+
+interface Stats {
+  totalExpense: number;
+  totalIncome: number;
+  expenseByType: Record<string, number>;
+  incomeByType: Record<string, number>;
+}
 
 function Home() {
-  const { characters, expenses, incomes, getCharacterStats, addCharacter, deleteCharacter, setCharacters, setExpenses, setIncomes } = useAppStore();
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [stats, setStats] = useState<Record<number, Stats>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newServer, setNewServer] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const userId = localStorage.getItem('userId');
 
-  const handleAddCharacter = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (userId) {
+      loadData();
+    }
+  }, [userId]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const charsResponse = await fetch(`${API_BASE}/${userId}/characters`);
+      const charsData = await charsResponse.json();
+      setCharacters(charsData);
+
+      const statsData: Record<number, Stats> = {};
+      for (const char of charsData) {
+        const statsResponse = await fetch(`${API_BASE}/${userId}/characters/${char.id}/stats`);
+        statsData[char.id] = await statsResponse.json();
+      }
+      setStats(statsData);
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      alert('加载数据失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCharacter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newName && newServer) {
-      addCharacter(newName, newServer);
-      setNewName('');
-      setNewServer('');
-      setShowAddModal(false);
+    if (!userId || !newName || !newServer) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/${userId}/characters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, server: newServer })
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadData();
+        setNewName('');
+        setNewServer('');
+        setShowAddModal(false);
+      } else {
+        alert(data.message || '添加失败');
+      }
+    } catch (error) {
+      alert('添加失败，请稍后重试');
     }
   };
 
-  const handleExport = () => {
-    const data = {
-      characters,
-      expenses,
-      incomes,
-      exportedAt: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mhxy-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  const handleDeleteCharacter = async (characterId: number) => {
+    if (!confirm('确定要删除这个人物吗？这将同时删除所有相关记录。')) return;
+    if (!userId) return;
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = JSON.parse(event.target?.result as string);
-          if (data.characters && data.expenses && data.incomes) {
-            setCharacters(data.characters);
-            setExpenses(data.expenses);
-            setIncomes(data.incomes);
-            alert('数据导入成功！');
-          } else {
-            alert('无效的备份文件！');
-          }
-        } catch (error) {
-          alert('导入失败，请检查文件格式！');
-        }
-      };
-      reader.readAsText(file);
+    try {
+      await fetch(`${API_BASE}/${userId}/characters/${characterId}`, {
+        method: 'DELETE'
+      });
+      loadData();
+    } catch (error) {
+      alert('删除失败，请稍后重试');
     }
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
+  const handleLogout = () => {
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    navigate('/login');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-white text-xl mb-2">加载中...</p>
+          <p className="text-slate-400">正在连接数据库</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
+          <div className="text-slate-400">
+            欢迎，<span className="text-amber-400">{localStorage.getItem('username')}</span>
+          </div>
           <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
           >
-            <Download className="w-5 h-5" />
-            导出数据
+            <LogOut className="w-5 h-5" />
+            退出登录
           </button>
-          <button
-            onClick={handleImportClick}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-          >
-            <Upload className="w-5 h-5" />
-            导入数据
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-          />
         </div>
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-amber-400 to-yellow-600 bg-clip-text text-transparent">
             梦幻西游消费记录
           </h1>
-          <p className="text-slate-400">记录您的游戏消费与收入</p>
+          <p className="text-slate-400">记录您的游戏消费与收入（数据云端同步）</p>
         </div>
 
         <div className="mb-8">
@@ -111,7 +145,7 @@ function Home() {
 
         <div className="space-y-4">
           {characters.map((character) => {
-            const stats = getCharacterStats(character.id);
+            const charStats = stats[character.id] || { totalExpense: 0, totalIncome: 0 };
             return (
               <div
                 key={character.id}
@@ -125,9 +159,7 @@ function Home() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm('确定要删除这个人物吗？这将同时删除所有相关记录。')) {
-                        deleteCharacter(character.id);
-                      }
+                      handleDeleteCharacter(character.id);
                     }}
                     className="text-red-400 hover:text-red-300 transition-colors"
                   >
@@ -138,11 +170,15 @@ function Home() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-red-500/10 rounded-xl p-4">
                     <p className="text-red-400 text-sm mb-1">总消费</p>
-                    <p className="text-2xl font-bold text-red-300">¥{stats.totalExpense.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-red-300">
+                      ¥{charStats.totalExpense?.toFixed(2) || '0.00'}
+                    </p>
                   </div>
                   <div className="bg-green-500/10 rounded-xl p-4">
                     <p className="text-green-400 text-sm mb-1">总收入</p>
-                    <p className="text-2xl font-bold text-green-300">¥{stats.totalIncome.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-green-300">
+                      ¥{charStats.totalIncome?.toFixed(2) || '0.00'}
+                    </p>
                   </div>
                 </div>
 
@@ -156,7 +192,7 @@ function Home() {
             );
           })}
 
-          {characters.length === 0 && (
+          {characters.length === 0 && !loading && (
             <div className="text-center py-16 text-slate-500">
               <p className="text-lg mb-2">还没有添加人物</p>
               <p className="text-sm">点击上方按钮添加您的第一个人物</p>

@@ -1,18 +1,123 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import useAppStore from '../store';
-import { EXPENSE_TYPE_LABELS } from '../types';
-import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2, Calendar, LogOut } from 'lucide-react';
+
+const API_BASE = '/api';
+
+const EXPENSE_TYPE_LABELS: Record<string, string> = {
+  point: '通用点卡费',
+  month: '月卡费',
+  year: '年卡费',
+  equipment: '装备费',
+  pet: '宝宝费'
+};
+
+interface Character {
+  id: number;
+  name: string;
+  server: string;
+}
+
+interface Expense {
+  id: number;
+  type: string;
+  amount: number;
+  date: string;
+  note: string;
+}
 
 function ExpenseDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
-  const { characters, getExpensesByCharacterAndType, addExpense, deleteExpense } = useAppStore();
-  const character = characters.find(c => c.id === id);
-  const expenses = getExpensesByCharacterAndType(id!, type as any);
+  const [character, setCharacter] = useState<Character | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const userId = localStorage.getItem('userId');
+
+  useEffect(() => {
+    if (userId && id && type) {
+      loadData();
+    }
+  }, [userId, id, type]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const charsResponse = await fetch(`${API_BASE}/${userId}/characters`);
+      const characters = await charsResponse.json();
+      const char = characters.find((c: Character) => c.id === parseInt(id!));
+      setCharacter(char);
+
+      if (char) {
+        const expenseResponse = await fetch(`${API_BASE}/${userId}/characters/${char.id}/expenses/${type}`);
+        setExpenses(await expenseResponse.json());
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      alert('加载数据失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = parseFloat(amount);
+    if (!userId || !id || isNaN(numAmount) || numAmount <= 0) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/${userId}/characters/${id}/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, amount: numAmount, date, note })
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadData();
+        setAmount('');
+        setNote('');
+        setShowAddModal(false);
+      } else {
+        alert(data.message || '添加失败');
+      }
+    } catch (error) {
+      alert('添加失败，请稍后重试');
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: number) => {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    if (!userId || !id) return;
+
+    try {
+      await fetch(`${API_BASE}/${userId}/characters/${id}/expenses/${expenseId}`, {
+        method: 'DELETE'
+      });
+      loadData();
+    } catch (error) {
+      alert('删除失败，请稍后重试');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    navigate('/login');
+  };
+
+  const totalAmount = expenses.reduce((sum, e) => sum + (typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <p className="text-white text-xl">加载中...</p>
+      </div>
+    );
+  }
 
   if (!character) {
     return (
@@ -27,29 +132,25 @@ function ExpenseDetail() {
     );
   }
 
-  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-  const handleAddExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (!isNaN(numAmount) && numAmount > 0) {
-      addExpense(character.id, type as any, numAmount, date, note);
-      setAmount('');
-      setNote('');
-      setShowAddModal(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-4xl mx-auto">
-        <Link
-          to={`/character/${id}`}
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          返回
-        </Link>
+        <div className="flex justify-between items-center mb-6">
+          <Link
+            to={`/character/${id}`}
+            className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            返回
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            退出登录
+          </button>
+        </div>
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 text-amber-400">{character.name}</h1>
@@ -82,13 +183,11 @@ function ExpenseDetail() {
                   {expense.note && <p className="text-slate-300">{expense.note}</p>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold text-red-400">¥{expense.amount.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-red-400">
+                    ¥{(typeof expense.amount === 'string' ? parseFloat(expense.amount) : expense.amount).toFixed(2)}
+                  </span>
                   <button
-                    onClick={() => {
-                      if (confirm('确定要删除这条记录吗？')) {
-                        deleteExpense(expense.id);
-                      }
-                    }}
+                    onClick={() => handleDeleteExpense(expense.id)}
                     className="text-red-400 hover:text-red-300 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />

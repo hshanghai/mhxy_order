@@ -1,18 +1,121 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import useAppStore from '../store';
-import { INCOME_TYPE_LABELS } from '../types';
-import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2, Calendar, LogOut } from 'lucide-react';
+
+const API_BASE = '/api';
+
+const INCOME_TYPE_LABELS: Record<string, string> = {
+  money: '出菜收入',
+  pet: '宝宝收入',
+  equipment: '装备收入'
+};
+
+interface Character {
+  id: number;
+  name: string;
+  server: string;
+}
+
+interface Income {
+  id: number;
+  type: string;
+  amount: number;
+  date: string;
+  note: string;
+}
 
 function IncomeDetail() {
   const { id, type } = useParams<{ id: string; type: string }>();
-  const { characters, getIncomesByCharacterAndType, addIncome, deleteIncome } = useAppStore();
-  const character = characters.find(c => c.id === id);
-  const incomes = getIncomesByCharacterAndType(id!, type as any);
+  const [character, setCharacter] = useState<Character | null>(null);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const userId = localStorage.getItem('userId');
+
+  useEffect(() => {
+    if (userId && id && type) {
+      loadData();
+    }
+  }, [userId, id, type]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const charsResponse = await fetch(`${API_BASE}/${userId}/characters`);
+      const characters = await charsResponse.json();
+      const char = characters.find((c: Character) => c.id === parseInt(id!));
+      setCharacter(char);
+
+      if (char) {
+        const incomeResponse = await fetch(`${API_BASE}/${userId}/characters/${char.id}/incomes/${type}`);
+        setIncomes(await incomeResponse.json());
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      alert('加载数据失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddIncome = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = parseFloat(amount);
+    if (!userId || !id || isNaN(numAmount) || numAmount <= 0) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/${userId}/characters/${id}/incomes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, amount: numAmount, date, note })
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadData();
+        setAmount('');
+        setNote('');
+        setShowAddModal(false);
+      } else {
+        alert(data.message || '添加失败');
+      }
+    } catch (error) {
+      alert('添加失败，请稍后重试');
+    }
+  };
+
+  const handleDeleteIncome = async (incomeId: number) => {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    if (!userId || !id) return;
+
+    try {
+      await fetch(`${API_BASE}/${userId}/characters/${id}/incomes/${incomeId}`, {
+        method: 'DELETE'
+      });
+      loadData();
+    } catch (error) {
+      alert('删除失败，请稍后重试');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    navigate('/login');
+  };
+
+  const totalAmount = incomes.reduce((sum, i) => sum + (typeof i.amount === 'string' ? parseFloat(i.amount) : i.amount), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <p className="text-white text-xl">加载中...</p>
+      </div>
+    );
+  }
 
   if (!character) {
     return (
@@ -27,29 +130,25 @@ function IncomeDetail() {
     );
   }
 
-  const totalAmount = incomes.reduce((sum, i) => sum + i.amount, 0);
-
-  const handleAddIncome = (e: React.FormEvent) => {
-    e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (!isNaN(numAmount) && numAmount > 0) {
-      addIncome(character.id, type as any, numAmount, date, note);
-      setAmount('');
-      setNote('');
-      setShowAddModal(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4">
       <div className="max-w-4xl mx-auto">
-        <Link
-          to={`/character/${id}`}
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          返回
-        </Link>
+        <div className="flex justify-between items-center mb-6">
+          <Link
+            to={`/character/${id}`}
+            className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            返回
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            退出登录
+          </button>
+        </div>
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 text-amber-400">{character.name}</h1>
@@ -82,13 +181,11 @@ function IncomeDetail() {
                   {income.note && <p className="text-slate-300">{income.note}</p>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold text-green-400">¥{income.amount.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-green-400">
+                    ¥{(typeof income.amount === 'string' ? parseFloat(income.amount) : income.amount).toFixed(2)}
+                  </span>
                   <button
-                    onClick={() => {
-                      if (confirm('确定要删除这条记录吗？')) {
-                        deleteIncome(income.id);
-                      }
-                    }}
+                    onClick={() => handleDeleteIncome(income.id)}
                     className="text-red-400 hover:text-red-300 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
