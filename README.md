@@ -4,20 +4,36 @@
 
 ## 功能特性
 
-- 🎮 人物管理：添加、删除游戏人物
-- 💰 消费记录：记录点卡、月卡、年卡、装备、宝宝等消费
-- 📈 收入记录：记录出菜、宝宝、装备等收入
-- 📊 统计概览：查看每个人物的总消费、总收入和分类统计
-- 📱 响应式设计：完美适配 H5 和桌面端
-- 💾 本地存储：数据自动保存到浏览器
-- 🔄 免费部署：支持部署到 Vercel/Netlify/GitHub Pages
+- 人物管理：添加、删除游戏人物
+- 消费记录：记录点卡、月卡、年卡、装备、宝宝等消费
+- 收入记录：记录出菜、宝宝、装备等收入
+- 统计概览：查看每个人物的总消费、总收入和分类统计
+- 响应式设计：适配 H5 和桌面端
+- 云端存储：数据存储在 Supabase（跨设备自动同步）
+- 账号体系：支持注册/登录（密码使用 scrypt 哈希存储）
 
 ## 快速开始
 
 ### 本地开发
 
+1. 安装依赖
+
 ```bash
 npm install
+```
+
+2. 配置环境变量（本地）
+
+在项目根目录创建 `.env`：
+
+```bash
+SUPABASE_URL=你的_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=你的_supabase_service_role_key
+```
+
+3. 启动开发
+
+```bash
 npm run dev
 ```
 
@@ -29,106 +45,32 @@ npm run dev
 npm run build
 ```
 
-构建产物将输出到 `dist` 目录。
+构建产物输出到 `dist` 目录。
 
-## 部署指南
+## 部署指南（推荐 Vercel）
 
-### 方式一：部署到 Vercel（推荐）
+本项目包含 `/api/*` 后端接口（用于注册/登录与数据读写），推荐使用 Vercel 部署（仓库已包含 `vercel.json`）。
 
-1. 将代码推送到 GitHub/GitLab/Bitbucket
-2. 访问 [vercel.com](https://vercel.com) 并使用 GitHub 账号登录
-3. 点击 "New Project"，选择您的仓库
-4. 保持默认配置，点击 "Deploy"
-5. 等待部署完成，您将获得一个公开访问的 URL
-
-### 方式二：部署到 Netlify
+### 部署到 Vercel
 
 1. 将代码推送到 GitHub
-2. 访问 [netlify.com](https://netlify.com) 并登录
-3. 点击 "New site from Git"，选择您的仓库
-4. 配置构建设置（Build command: `npm run build`，Publish directory: `dist`）
-5. 点击 "Deploy site"
-
-### 方式三：部署到 GitHub Pages
-
-1. 在 `package.json` 中添加 homepage 字段：
-   ```json
-   "homepage": "https://<your-username>.github.io/<repo-name>"
-   ```
-2. 安装 gh-pages：
-   ```bash
-   npm install -D gh-pages
-   ```
-3. 在 `package.json` 中添加 scripts：
-   ```json
-   "predeploy": "npm run build",
-   "deploy": "gh-pages -d dist"
-   ```
-4. 运行 `npm run deploy`
+2. 访问 https://vercel.com 并登录
+3. 点击 New Project 选择仓库并部署
+4. 在 Vercel 项目 Settings -> Environment Variables 配置（Production/Preview/Development 都建议配置）：
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+5. 重新部署一次（Redeploy）使环境变量生效
 
 ## 技术栈
 
 - React 18 + TypeScript
 - Vite
 - Tailwind CSS
-- Zustand
 - React Router
-- Lucide React
+- Supabase（Postgres）
+- Node/Express（Vercel Serverless Functions）
 
 ## 重要提示
 
-📱 **跨设备同步方法**：
-- 在设备 A 上点击"导出数据"，保存 JSON 文件
-- 在设备 B 上点击"导入数据"，选择刚才保存的文件
-- 即可完成数据同步！
-
-⚠️ 当前数据存储在浏览器的 localStorage 中，建议定期导出备份。
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  extends: [
-    // other configs...
-    // Enable lint rules for React
-    reactX.configs['recommended-typescript'],
-    // Enable lint rules for React DOM
-    reactDom.configs.recommended,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+- 当前账号体系使用自建 `users` 表实现，并未接入 Supabase Auth
+- 建议在 Supabase 后台定期做数据库备份
